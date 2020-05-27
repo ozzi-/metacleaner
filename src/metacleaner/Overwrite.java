@@ -25,5 +25,4 @@ public class Overwrite {
 	public boolean isOverwrite() {
 		return overwrite;
 	}
-
 }

@@ -5,6 +5,10 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
 
 import javax.imageio.ImageIO;
 
@@ -12,6 +16,9 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.pdmodel.common.PDMetadata;
+import org.odftoolkit.simple.*;
+import org.odftoolkit.simple.meta.Meta;
+
 
 public class Cleaner {
 
@@ -20,14 +27,14 @@ public class Cleaner {
 		Overwrite ov = new Overwrite(true, "_cleaned");
 
 		try {
-			clean("C:\\Users\\ozzi\\Desktop\\pdfa_metadata-2b.pdf", ov);
+			clean("C:\\Users\\ozzi\\Desktop\\example.odt", ov);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
 	}
 
-	public static void clean(String path, Overwrite overwrite) throws IOException {
+	public static void clean(String path, Overwrite overwrite) throws Exception {
 		File file = new File(path);
 		if (!file.exists()) {
 			throw new FileNotFoundException("File '" + path + "' not found or readable");
@@ -37,6 +44,11 @@ public class Cleaner {
 		int lastDot = path.lastIndexOf(".") + 1;
 		String fileEnding = pathLower.substring(lastDot);
 
+		// TODO MS Office
+		// TODO ZIP
+		// TODO PSD
+		// TODO XSD
+		
 		if (fileEnding.equals("jpg") || fileEnding.equals("jpeg")) {
 			System.out.println("File ending found: JPG");
 			stripImage(path, "jpg", overwrite);
@@ -46,10 +58,40 @@ public class Cleaner {
 		} else if (fileEnding.equals("pdf")) {
 			System.out.println("File ending found: PDF");
 			stripPDF(path, overwrite);
+		} else if (fileEnding.equals("odt") || fileEnding.equals("ods") || fileEnding.equals("odp")) {
+			System.out.println("File ending found: ODT/ODS/ODP");
+			stripOpenDoc(path, overwrite);
 		} else {
 			throw new UnsupportedOperationException("File type '" + fileEnding + "' is not implemented");
 		}
 		System.out.println("Written clean document to " + overwrite.getPath(path));
+	}
+	
+	private static void stripOpenDoc(String path, Overwrite overwrite) throws MalformedURLException, IOException, Exception {
+		TextDocument odfDoc = TextDocument.loadDocument(new File(path));
+		Meta metadata = odfDoc.getOfficeMetadata();
+			
+		List<String> userDefinedNames = metadata.getUserDefinedDataNames();
+		for (String userDefinedName : userDefinedNames) {
+			metadata.removeUserDefinedDataByName(userDefinedName);
+		}
+	
+		metadata.setCreationDate(Calendar.getInstance());
+		metadata.setCreator("");
+		metadata.setDcdate(Calendar.getInstance());
+		metadata.setDescription("");
+		metadata.setEditingCycles(0);
+		metadata.setGenerator("");
+		metadata.setInitialCreator("");
+		metadata.setKeywords(new ArrayList<String>());
+		metadata.setLanguage("");
+		metadata.setPrintDate(Calendar.getInstance());
+		metadata.setPrintedBy("");
+		metadata.setSubject("");
+		metadata.setTitle("");
+		
+		odfDoc.save(overwrite.getPath(path));
+		odfDoc.close();
 	}
 
 	private static void stripImage(String path, String outType, Overwrite overwrite) {
@@ -77,3 +119,4 @@ public class Cleaner {
 		document.save(overwrite.getPath(path));
 	}
 }
+
