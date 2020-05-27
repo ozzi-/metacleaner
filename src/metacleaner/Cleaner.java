@@ -20,7 +20,7 @@ public class Cleaner {
 		Overwrite ov = new Overwrite(true, "_cleaned");
 
 		try {
-			clean("C:\\Users\\ozzi\\Desktop\\example.pdf", ov);
+			clean("C:\\Users\\ozzi\\Desktop\\pdfa_metadata-2b.pdf", ov);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
