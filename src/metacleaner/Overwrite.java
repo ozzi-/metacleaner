@@ -3,10 +3,12 @@ package metacleaner;
 public class Overwrite {
 	private boolean overwrite;
 	private String overwriteAppender;
+	private boolean harshMode;
 	
-	public Overwrite(boolean overwrite, String overwriteAppender) {
+	public Overwrite(boolean overwrite, String overwriteAppender, boolean harshMode) {
 		this.overwrite=overwrite;
 		this.overwriteAppender=overwriteAppender;
+		this.harshMode = harshMode;
 	}
 	
 	public String getPath(String path) {
@@ -24,5 +26,13 @@ public class Overwrite {
 
 	public boolean isOverwrite() {
 		return overwrite;
+	}
+
+	public boolean isHarshMode() {
+		return harshMode;
+	}
+
+	public void setHarshMode(boolean harshMode) {
+		this.harshMode = harshMode;
 	}
 }
