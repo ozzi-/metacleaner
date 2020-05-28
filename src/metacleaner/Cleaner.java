@@ -36,6 +36,7 @@ import org.apache.poi.hpsf.DocumentSummaryInformation;
 import org.apache.poi.hpsf.PropertySet;
 import org.apache.poi.hpsf.SummaryInformation;
 import org.apache.poi.ooxml.POIXMLProperties;
+import org.apache.poi.ooxml.POIXMLProperties.CoreProperties;
 import org.apache.poi.ooxml.POIXMLProperties.ExtendedProperties;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.poifs.filesystem.DirectoryEntry;
@@ -57,7 +58,7 @@ public class Cleaner {
 		Overwrite ov = new Overwrite(true, "_cleaned", true);
 
 		try {
-			clean("C:\\Users\\ozzi\\Desktop\\example.xml", ov);
+			clean("C:\\Users\\ozzi\\Desktop\\custom_properties.xlsx", ov);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -127,11 +128,10 @@ public class Cleaner {
 		return contentBuilder.toString();
 	}
 
-	@SuppressWarnings("deprecation")
 	private static void stripMSDocExcelNew(String path, Overwrite overwrite)
 			throws EncryptedDocumentException, IOException {
-		XSSFWorkbook wb = (XSSFWorkbook) WorkbookFactory.create(new File(path));
-		System.out.println(wb.getActiveSheetIndex() + " " + wb.getAllNames().toString());
+		
+		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(path));
 		POIXMLProperties props = wb.getProperties();
 
 		POIXMLProperties.CoreProperties coreProp = props.getCoreProperties();
@@ -153,12 +153,8 @@ public class Cleaner {
 
 		POIXMLProperties.CustomProperties custProp = props.getCustomProperties();
 
-		CTProperties underlying = custProp.getUnderlyingProperties();
-		for (int i = 0; i < underlying.sizeOfPropertyArray(); i++) {
-			underlying.removeProperty(i);
-			// TODO remove debug once tested
-			System.out.println("debug - removing '" + underlying.getPropertyArray().toString() + "'");
-		}
+		removeUnderlyingProps(custProp,0);
+	
 		// custProp.addProperty("Author", "test");
 
 		ExtendedProperties extendedProperties = props.getExtendedProperties();
@@ -173,17 +169,65 @@ public class Cleaner {
 		FileOutputStream fos = new FileOutputStream(overwrite.getPath(path));
 		wb.write(fos);
 		fos.close();
+		wb.close();
+	}
+
+
+	
+	private static void removeUnderlyingProps(POIXMLProperties.CustomProperties custProp, int depth) {
+		CTProperties underlying = custProp.getUnderlyingProperties();
+		for (int i = 0; i < underlying.sizeOfPropertyArray(); i++) {
+			underlying.removeProperty(i);
+		}
+		// this needs to be done as XLSX seem to have trouble removing all custom properties in the first go
+		// DOCX was fine however.
+		if(underlying.sizeOfPropertyArray()>0) {
+			depth++;
+			if(depth>10) {
+				System.out.println("Could not remove all underlying custom properties as reached max recursion depth");
+			}
+			removeUnderlyingProps(custProp,depth);
+		}
 	}
 
 	private static void stripMSDocNew(String path, Overwrite overwrite) throws Exception {
-		XWPFDocument doc = new XWPFDocument(OPCPackage.open(path));
-		POIXMLProperties properties = doc.getProperties();
-		// TODO
-		properties.getCoreProperties();
-		properties.getCustomProperties();
-		properties.getExtendedProperties();
-		System.out.println(doc.getPart());
-		doc.close();
+		XWPFDocument docx = new XWPFDocument(new FileInputStream(path));
+		POIXMLProperties properties = docx.getProperties();
+		
+		CoreProperties coreProperties = properties.getCoreProperties();
+		coreProperties.setCategory("");
+		coreProperties.setContentStatus("");
+		coreProperties.setContentType("");
+		coreProperties.setCreated("");
+		coreProperties.setCreator("");
+		coreProperties.setDescription("");
+		coreProperties.setIdentifier("");
+		coreProperties.setKeywords("");
+		coreProperties.setLastModifiedByUser("");
+		coreProperties.setLastPrinted("");
+		coreProperties.setModified("");
+		coreProperties.setRevision("");
+		coreProperties.setSubjectProperty("");
+		// TODO harshmode excludes
+		coreProperties.setTitle("");
+		
+		org.apache.poi.ooxml.POIXMLProperties.CustomProperties customProperties = properties.getCustomProperties();
+		removeUnderlyingProps(customProperties,0);
+
+		ExtendedProperties extendedProperties = properties.getExtendedProperties();
+		extendedProperties.setApplication("");
+		extendedProperties.setAppVersion("");
+		extendedProperties.setCharacters(1);
+		extendedProperties.setCompany("");
+		extendedProperties.setManager("");
+		extendedProperties.setTemplate("");
+		extendedProperties.setTotalTime(0);
+				
+		FileOutputStream fos = new FileOutputStream(overwrite.getPath(path));
+		docx.write(fos);
+		fos.close();
+		docx.close();
+
 	}
 
 	private static void stripMSDoc(String path, Overwrite overwrite) throws Exception {
