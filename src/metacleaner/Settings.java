@@ -1,27 +1,28 @@
 package metacleaner;
 
-public class Overwrite {
+public class Settings {
 	private boolean overwrite;
-	private String overwriteAppender;
+	private String suffix;
 	private boolean harshMode;
+	private String path;
 	
-	public Overwrite(boolean overwrite, String overwriteAppender, boolean harshMode) {
+	public Settings(String path, boolean overwrite, String suffix, boolean harshMode) {
+		this.path=path;
 		this.overwrite=overwrite;
-		this.overwriteAppender=overwriteAppender;
+		this.suffix=suffix;
 		this.harshMode = harshMode;
 	}
 	
-	public String getPath(String path) {
-		if(!overwrite) {
+	public String getOutputPath() {
+		if(overwrite) {
 			return path;
 		}
 		int dotPos = path.lastIndexOf(".");
-		String finalPath = path.substring(0,dotPos)+overwriteAppender+path.substring(dotPos);
-		return finalPath;
+		return path.substring(0,dotPos)+suffix+path.substring(dotPos);
 	}
 
 	public String getOverwriteAppender() {
-		return overwriteAppender;
+		return suffix;
 	}
 
 	public boolean isOverwrite() {
@@ -34,5 +35,13 @@ public class Overwrite {
 
 	public void setHarshMode(boolean harshMode) {
 		this.harshMode = harshMode;
+	}
+
+	public String getPath() {
+		return path;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
 	}
 }

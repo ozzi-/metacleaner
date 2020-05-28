@@ -14,17 +14,15 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
+
 
 import javax.imageio.ImageIO;
+
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
@@ -36,15 +34,12 @@ import org.apache.poi.hpsf.DocumentSummaryInformation;
 import org.apache.poi.hpsf.PropertySet;
 import org.apache.poi.hpsf.SummaryInformation;
 import org.apache.poi.ooxml.POIXMLProperties;
-import org.apache.poi.ooxml.POIXMLProperties.CoreProperties;
 import org.apache.poi.ooxml.POIXMLProperties.ExtendedProperties;
-import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.poifs.filesystem.DirectoryEntry;
 import org.apache.poi.poifs.filesystem.DocumentEntry;
 import org.apache.poi.poifs.filesystem.DocumentInputStream;
 import org.apache.poi.poifs.filesystem.Entry;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.odftoolkit.simple.*;
@@ -53,19 +48,25 @@ import org.openxmlformats.schemas.officeDocument.x2006.customProperties.CTProper
 
 public class Cleaner {
 
+	
+	// TODO add ZIP support - https://github.com/KittyHawkCorp/stripzip/ ?
+	// TODO add directory support
+	
 	public static void main(String[] args) {
-		// TODO parse args
-		Overwrite ov = new Overwrite(true, "_cleaned", true);
-
+		System.out.println("metacleaner - github.com/ozzi-/metacleaner");
+		System.out.println("------------------------------------------");
+        Settings settings = Helpers.parseCLIArgs(args);
 		try {
-			clean("C:\\Users\\ozzi\\Desktop\\custom_properties.xlsx", ov);
+			clean(settings);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
 	}
 
-	public static void clean(String path, Overwrite overwrite) throws Exception {
+
+	public static void clean(Settings settings) throws Exception {
+		String path = settings.getPath();
 		File file = new File(path);
 		if (!file.exists()) {
 			throw new FileNotFoundException("File '" + path + "' not found or readable");
@@ -74,43 +75,49 @@ public class Cleaner {
 		String pathLower = path.toLowerCase();
 		int lastDot = path.lastIndexOf(".") + 1;
 		String fileEnding = pathLower.substring(lastDot);
-
-		// TODO ZIP - https://github.com/KittyHawkCorp/stripzip/ ?
+		if(lastDot==0) {
+			throw new UnsupportedOperationException("\\_ i require a file ending (no dot found)");
+		}
 
 		if (fileEnding.equals("jpg") || fileEnding.equals("jpeg")) {
-			System.out.println("File ending found: JPG");
-			stripImage(path, "jpg", overwrite);
+			matchedEnding(fileEnding);
+			stripImage("jpg", settings);
 		} else if (fileEnding.equals("png")) {
-			System.out.println("File ending found: PNG");
-			stripImage(path, "png", overwrite);
+			matchedEnding(fileEnding);
+			stripImage("png", settings);
 		} else if (fileEnding.equals("pdf")) {
-			System.out.println("File ending found: PDF");
-			stripPDF(path, overwrite);
+			matchedEnding(fileEnding);
+			stripPDF(settings);
 		} else if (fileEnding.equals("odt") || fileEnding.equals("ods") || fileEnding.equals("odp")) {
-			System.out.println("File ending found: ODT/ODS/ODP");
-			stripOpenDoc(path, overwrite);
+			matchedEnding(fileEnding);
+			stripOpenDoc(settings);
 		} else if (fileEnding.equals("doc") || fileEnding.equals("xls") || fileEnding.equals("ppt")) {
-			System.out.println("File ending found: DOC/XLS/PPT");
-			stripMSDoc(path, overwrite);
+			matchedEnding(fileEnding);
+			stripMSDoc(settings);
 		} else if (fileEnding.equals("docx")) {
-			System.out.println("File ending found: DOCX");
-			stripMSDocNew(path, overwrite);
+			matchedEnding(fileEnding);
+			stripMSDocNew(settings);
 		} else if (fileEnding.equals("xlsx")) {
-			System.out.println("File ending found: XLSX");
-			stripMSDocExcelNew(path, overwrite);
+			matchedEnding(fileEnding);
+			stripMSDocExcelNew(settings);
 		} else if (fileEnding.equals("xml")) {
-			System.out.println("File ending found: XML");
-			stripXMLComments(path, overwrite);
+			matchedEnding(fileEnding);
+			stripXMLComments(settings);
 		} else {
-			throw new UnsupportedOperationException("File type '" + fileEnding + "' is not implemented");
+			throw new UnsupportedOperationException("\\_ metacleaner does not (yet) support the file type '" + fileEnding + "'. feel free to open a GitHub issue!");
 		}
-		System.out.println("Written clean document to " + overwrite.getPath(path));
+		System.out.println("\\_ cleaned document successfully written to " + settings.getOutputPath());
 	}
 
-	private static void stripXMLComments(String path, Overwrite overwrite) throws IOException {
-		String xml = readLbL(path);
+
+	private static void matchedEnding(String fileEnding) {
+		System.out.println("\\_ supporting '"+fileEnding+"' files - continuing");
+	}
+
+	private static void stripXMLComments(Settings settings) throws IOException {
+		String xml = Helpers.readLbL(settings.getPath());
 		xml = xml.replaceAll("(?s)<!--.*?-->", "");
-		Writer out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(overwrite.getPath(path)), StandardCharsets.UTF_8));
+		Writer out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(settings.getOutputPath()), StandardCharsets.UTF_8));
 		try {
 			out.write(xml);
 		} finally {
@@ -118,22 +125,42 @@ public class Cleaner {
 		}
 	}
 
-	private static String readLbL(String filePath) {
-		StringBuilder contentBuilder = new StringBuilder();
-		try (Stream<String> stream = Files.lines(Paths.get(filePath), StandardCharsets.UTF_8)) {
-			stream.forEach(s -> contentBuilder.append(s).append("\n"));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return contentBuilder.toString();
-	}
-
-	private static void stripMSDocExcelNew(String path, Overwrite overwrite)
+	private static void stripMSDocExcelNew(Settings settings)
 			throws EncryptedDocumentException, IOException {
 		
-		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(path));
+		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(settings.getPath()));
 		POIXMLProperties props = wb.getProperties();
 
+		nullCoreProperties(props);
+
+		POIXMLProperties.CustomProperties custProp = props.getCustomProperties();
+
+		removeUnderlyingProps(custProp,0);
+	
+		// custProp.addProperty("Author", "test");
+
+		nullExtendedProperties(props);
+
+		FileOutputStream fos = new FileOutputStream(settings.getOutputPath());
+		wb.write(fos);
+		fos.close();
+		wb.close();
+	}
+
+
+	private static void nullExtendedProperties(POIXMLProperties props) {
+		ExtendedProperties extendedProperties = props.getExtendedProperties();
+		extendedProperties.setApplication("");
+		extendedProperties.setAppVersion("");
+		extendedProperties.setCharacters(1);
+		extendedProperties.setCompany("");
+		extendedProperties.setManager("");
+		extendedProperties.setTemplate("");
+		extendedProperties.setTotalTime(0);
+	}
+
+
+	private static void nullCoreProperties(POIXMLProperties props) {
 		POIXMLProperties.CoreProperties coreProp = props.getCoreProperties();
 		coreProp.setCategory("");
 		coreProp.setContentStatus("");
@@ -150,28 +177,7 @@ public class Cleaner {
 		coreProp.setSubjectProperty("");
 		// TODO harshmode excludes
 		coreProp.setTitle("");
-
-		POIXMLProperties.CustomProperties custProp = props.getCustomProperties();
-
-		removeUnderlyingProps(custProp,0);
-	
-		// custProp.addProperty("Author", "test");
-
-		ExtendedProperties extendedProperties = props.getExtendedProperties();
-		extendedProperties.setApplication("");
-		extendedProperties.setAppVersion("");
-		extendedProperties.setCharacters(1);
-		extendedProperties.setCompany("");
-		extendedProperties.setManager("");
-		extendedProperties.setTemplate("");
-		extendedProperties.setTotalTime(0);
-
-		FileOutputStream fos = new FileOutputStream(overwrite.getPath(path));
-		wb.write(fos);
-		fos.close();
-		wb.close();
 	}
-
 
 	
 	private static void removeUnderlyingProps(POIXMLProperties.CustomProperties custProp, int depth) {
@@ -190,59 +196,37 @@ public class Cleaner {
 		}
 	}
 
-	private static void stripMSDocNew(String path, Overwrite overwrite) throws Exception {
-		XWPFDocument docx = new XWPFDocument(new FileInputStream(path));
+	private static void stripMSDocNew(Settings settings) throws Exception {
+		XWPFDocument docx = new XWPFDocument(new FileInputStream(settings.getPath()));
 		POIXMLProperties properties = docx.getProperties();
 		
-		CoreProperties coreProperties = properties.getCoreProperties();
-		coreProperties.setCategory("");
-		coreProperties.setContentStatus("");
-		coreProperties.setContentType("");
-		coreProperties.setCreated("");
-		coreProperties.setCreator("");
-		coreProperties.setDescription("");
-		coreProperties.setIdentifier("");
-		coreProperties.setKeywords("");
-		coreProperties.setLastModifiedByUser("");
-		coreProperties.setLastPrinted("");
-		coreProperties.setModified("");
-		coreProperties.setRevision("");
-		coreProperties.setSubjectProperty("");
-		// TODO harshmode excludes
-		coreProperties.setTitle("");
+		nullCoreProperties(properties);
 		
 		org.apache.poi.ooxml.POIXMLProperties.CustomProperties customProperties = properties.getCustomProperties();
 		removeUnderlyingProps(customProperties,0);
 
-		ExtendedProperties extendedProperties = properties.getExtendedProperties();
-		extendedProperties.setApplication("");
-		extendedProperties.setAppVersion("");
-		extendedProperties.setCharacters(1);
-		extendedProperties.setCompany("");
-		extendedProperties.setManager("");
-		extendedProperties.setTemplate("");
-		extendedProperties.setTotalTime(0);
+		nullExtendedProperties(properties);
 				
-		FileOutputStream fos = new FileOutputStream(overwrite.getPath(path));
+		FileOutputStream fos = new FileOutputStream(settings.getOutputPath());
 		docx.write(fos);
 		fos.close();
 		docx.close();
 
 	}
 
-	private static void stripMSDoc(String path, Overwrite overwrite) throws Exception {
-		InputStream is = new FileInputStream(path);
+	private static void stripMSDoc(Settings settings) throws Exception {
+		InputStream is = new FileInputStream(settings.getPath());
 		POIFSFileSystem poifs = new POIFSFileSystem(is);
 		is.close();
 		DirectoryEntry dir = poifs.getRoot();
-		clearEntries(dir, overwrite);
-		OutputStream out = new FileOutputStream(overwrite.getPath(path));
+		clearEntries(dir, settings);
+		OutputStream out = new FileOutputStream(settings.getOutputPath());
 		poifs.writeFilesystem(out);
 		out.close();
 		poifs.close();
 	}
 
-	private static void clearEntries(DirectoryEntry dir, Overwrite overwrite) throws Exception {
+	private static void clearEntries(DirectoryEntry dir, Settings settings) throws Exception {
 		DocumentSummaryInformation dsi;
 		try {
 			Set<String> entryNamesSet = dir.getEntryNames();
@@ -273,7 +257,7 @@ public class Cleaner {
 							si.setLastSaveDateTime(Calendar.getInstance().getTime());
 							si.setOSVersion(0);
 							si.setTemplate("");
-							if (overwrite.isHarshMode()) {
+							if (settings.isHarshMode()) {
 								si.setSubject("");
 								si.setTitle("");
 							}
@@ -301,7 +285,7 @@ public class Cleaner {
 							dsi.setContentStatus("");
 							dsi.setContentType("");
 							dsi.setDocumentVersion("");
-							if (overwrite.isHarshMode()) {
+							if (settings.isHarshMode()) {
 								dsi.setLanguage("");
 							}
 							dsi.setManager("");
@@ -311,16 +295,15 @@ public class Cleaner {
 					}
 				} else if (entry.isDirectoryEntry()) {
 					DirectoryEntry b = (DirectoryEntry) entry;
-					clearEntries(b, overwrite);
+					clearEntries(b, settings);
 				}
 			}
 		} catch (FileNotFoundException ex) {
 		}
 	}
 
-	private static void stripOpenDoc(String path, Overwrite overwrite)
-			throws MalformedURLException, IOException, Exception {
-		TextDocument odfDoc = TextDocument.loadDocument(new File(path));
+	private static void stripOpenDoc(Settings settings) throws MalformedURLException, IOException, Exception {
+		TextDocument odfDoc = TextDocument.loadDocument(new File(settings.getPath()));
 		Meta metadata = odfDoc.getOfficeMetadata();
 
 		List<String> userDefinedNames = metadata.getUserDefinedDataNames();
@@ -339,29 +322,29 @@ public class Cleaner {
 		metadata.setLanguage("");
 		metadata.setPrintDate(Calendar.getInstance());
 		metadata.setPrintedBy("");
-		if (overwrite.isHarshMode()) {
+		if (settings.isHarshMode()) {
 			metadata.setSubject("");
 			metadata.setTitle("");
 		}
 
-		odfDoc.save(overwrite.getPath(path));
+		odfDoc.save(settings.getOutputPath());
 		odfDoc.close();
 	}
 
-	private static void stripImage(String path, String outType, Overwrite overwrite) {
+	private static void stripImage(String outType, Settings settings) {
 		BufferedImage image;
 		try {
-			image = ImageIO.read(new File(path));
-			String writeToPath = overwrite.getPath(path);
+			image = ImageIO.read(new File(settings.getPath()));
+			String writeToPath = settings.getOutputPath();
 			ImageIO.write(image, outType, new File(writeToPath));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private static void stripPDF(String path, Overwrite overwrite) throws IOException {
+	private static void stripPDF(Settings settings) throws IOException {
 		// TODO harshmode, don't strip title? does pdf have those fields?
-		PDDocument document = PDDocument.load(new File(path));
+		PDDocument document = PDDocument.load(new File(settings.getPath()));
 		// clean basic
 		PDDocumentInformation empty = new PDDocumentInformation();
 		document.setDocumentInformation(empty);
@@ -370,6 +353,6 @@ public class Cleaner {
 		PDMetadata newMetadata = new PDMetadata(document, new ByteArrayInputStream("".getBytes()));
 		catalog.setMetadata(newMetadata);
 
-		document.save(overwrite.getPath(path));
+		document.save(settings.getOutputPath());
 	}
 }
