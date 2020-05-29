@@ -18,15 +18,26 @@ public class Settings {
 		this.harshMode = harshMode;
 	}
 	
+	public String getOutputPathStrict(String path) {
+		int dotPos = path.lastIndexOf(".");
+		if(dotPos==-1) {
+			return path+suffix;
+		}
+		return path.substring(0,dotPos)+suffix+path.substring(dotPos);
+	}
+	
 	public String getOutputPath(String path) {
 		if(overwrite) {
 			return path;
 		}
 		int dotPos = path.lastIndexOf(".");
+		if(dotPos==-1) {
+			return path+suffix;
+		}
 		return path.substring(0,dotPos)+suffix+path.substring(dotPos);
 	}
 
-	public String getOverwriteAppender() {
+	public String getSuffix() {
 		return suffix;
 	}
 

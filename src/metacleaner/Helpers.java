@@ -27,13 +27,13 @@ public class Helpers {
         Option suffix = new Option("s", "suffix", true, "suffix of output file");
         options.addOption(suffix);
         
-        Option recursive = new Option("r", "recursive", true, "search for files recursively if input path is a directory");
+        Option recursive = new Option("r", "recursive", false, "search for files recursively if input path is a directory");
         options.addOption(recursive);
 
-        Option overwrite = new Option("o", "overwrite", true, "overwrite input file");
+        Option overwrite = new Option("o", "overwrite", false, "overwrite input file");
         options.addOption(overwrite);
         
-        Option harsh = new Option("h", "harsh", false, "remove ALL metadata, such as potentially harmless data such as title and subject");
+        Option harsh = new Option("h", "harsh", false, "remove ALL metadata, such as potentially harmless data (i.E. title and subject)");
         options.addOption(harsh);
 
         CommandLineParser parser = new DefaultParser();
@@ -70,15 +70,41 @@ public class Helpers {
 		File file = new File(inputFilePath);
 		if(file.isDirectory()) {
 			isDirectory=true;
-			System.out.println("\\_ input path is directory - "+(recursiveVal?"will scan recursively for files":"won't scan recursively"));
-		}
-		if (!file.exists()) {
+			System.out.println("\\_ input path is a directory - "+(recursiveVal?"will scan recursively for files":"won't scan recursively"));
+		}else if (!file.exists()) {
 			throw new FileNotFoundException("File '" + inputFilePath + "' not found or readable");
+		}else {
+			System.out.println("\\_ input path is a file");
 		}
         
         return new Settings(inputFilePath, isDirectory, recursiveVal, overwriteVal, suffixVal, harshVal);
 	}
+	
+	static void matchedEnding(String fileEnding, boolean printSupported) {
+		if(printSupported) {
+			System.out.println("  |_ supporting '" + fileEnding + "' files - continuing");			
+		}
+	}
+	
+	static String appendSlashIfNone(String path) {
+		if(!path.endsWith(File.separator)) {
+			path=path+File.separator;
+		}
+		return path;
+	}
 
+	static boolean isAlreadyClean(Settings settings, String pathS) {
+		int lastDotPos = pathS.lastIndexOf(".");
+		String fileEnding = pathS.substring(lastDotPos + 1);
+		String endsWith="";
+		if(lastDotPos == -1) {
+			endsWith = settings.getSuffix()+fileEnding;				
+		}else {
+			endsWith = settings.getSuffix()+"."+fileEnding;
+		}
+		return pathS.toLowerCase().endsWith(endsWith.toLowerCase());
+	}
+	
 	public static String readLbL(String filePath) {
 		StringBuilder contentBuilder = new StringBuilder();
 		try (Stream<String> stream = Files.lines(Paths.get(filePath), StandardCharsets.UTF_8)) {
