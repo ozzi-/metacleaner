@@ -2,18 +2,23 @@ package metacleaner;
 
 public class Settings {
 	private boolean overwrite;
+	private boolean isDirectory;
+	private boolean recursive;
 	private String suffix;
 	private boolean harshMode;
 	private String path;
 	
-	public Settings(String path, boolean overwrite, String suffix, boolean harshMode) {
+
+	public Settings(String path, boolean isDirectory, boolean recursive, boolean overwrite, String suffix, boolean harshMode) {
 		this.path=path;
+		this.isDirectory=isDirectory;		
+		this.recursive=recursive;
 		this.overwrite=overwrite;
 		this.suffix=suffix;
 		this.harshMode = harshMode;
 	}
 	
-	public String getOutputPath() {
+	public String getOutputPath(String path) {
 		if(overwrite) {
 			return path;
 		}
@@ -43,5 +48,21 @@ public class Settings {
 
 	public void setPath(String path) {
 		this.path = path;
+	}
+
+	public boolean isRecursive() {
+		return recursive;
+	}
+
+	public void setRecursive(boolean recursive) {
+		this.recursive = recursive;
+	}
+
+	public boolean isDirectory() {
+		return isDirectory;
+	}
+
+	public void setDirectory(boolean isDirectory) {
+		this.isDirectory = isDirectory;
 	}
 }

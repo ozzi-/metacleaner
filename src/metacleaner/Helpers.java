@@ -1,5 +1,7 @@
 package metacleaner;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,15 +17,18 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 public class Helpers {
-	public static Settings parseCLIArgs(String[] args) {
+	public static Settings parseCLIArgs(String[] args) throws FileNotFoundException {
 		Options options = new Options();
 
-        Option input = new Option("i", "input", true, "input file path *");
+        Option input = new Option("i", "input", true, "input file / directory path *");
         input.setRequired(true);
         options.addOption(input);
         
         Option suffix = new Option("s", "suffix", true, "suffix of output file");
         options.addOption(suffix);
+        
+        Option recursive = new Option("r", "recursive", true, "search for files recursively if input path is a directory");
+        options.addOption(recursive);
 
         Option overwrite = new Option("o", "overwrite", true, "overwrite input file");
         options.addOption(overwrite);
@@ -44,9 +49,10 @@ public class Helpers {
         }
         String suffixVal="";
         String inputFilePath = cmd.getOptionValue("input");
+        boolean recursiveVal = cmd.hasOption("recursive");
         boolean overwriteVal = cmd.hasOption("overwrite");
         if(overwriteVal) {
-        	System.out.println("\\_ will overwrite input file");
+        	System.out.println("\\_ will overwrite input file(s)");
         }else {
         	suffixVal = cmd.getOptionValue("suffix");
         	if(suffixVal!=null) {
@@ -59,7 +65,18 @@ public class Helpers {
         if(harshVal) {
         	System.out.println("\\_ using harsh mode");
         }
-        return new Settings(inputFilePath, overwriteVal, suffixVal, harshVal);
+        
+        boolean isDirectory=false;
+		File file = new File(inputFilePath);
+		if(file.isDirectory()) {
+			isDirectory=true;
+			System.out.println("\\_ input path is directory - "+(recursiveVal?"will scan recursively for files":"won't scan recursively"));
+		}
+		if (!file.exists()) {
+			throw new FileNotFoundException("File '" + inputFilePath + "' not found or readable");
+		}
+        
+        return new Settings(inputFilePath, isDirectory, recursiveVal, overwriteVal, suffixVal, harshVal);
 	}
 
 	public static String readLbL(String filePath) {

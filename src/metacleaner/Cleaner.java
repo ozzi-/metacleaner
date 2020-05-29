@@ -14,15 +14,17 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
-
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
-
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
@@ -48,76 +50,122 @@ import org.openxmlformats.schemas.officeDocument.x2006.customProperties.CTProper
 
 public class Cleaner {
 
-	
 	// TODO add ZIP support - https://github.com/KittyHawkCorp/stripzip/ ?
 	// TODO add directory support
-	
+
 	public static void main(String[] args) {
 		System.out.println("metacleaner - github.com/ozzi-/metacleaner");
 		System.out.println("------------------------------------------");
-        Settings settings = Helpers.parseCLIArgs(args);
 		try {
+			Settings settings = Helpers.parseCLIArgs(args);
 			clean(settings);
 		} catch (Exception e) {
 			e.printStackTrace();
+			System.out.println("Exiting (1)");
 			System.exit(1);
 		}
+		System.out.println("\\_ done");
 	}
-
 
 	public static void clean(Settings settings) throws Exception {
 		String path = settings.getPath();
-		File file = new File(path);
-		if (!file.exists()) {
-			throw new FileNotFoundException("File '" + path + "' not found or readable");
+		if(settings.isDirectory()) {
+			if(settings.isRecursive()) {
+				doCleanDirectoryRecursively(settings, path);
+			}else {
+				doCleanDirectory(settings, path);
+			}
+		}else {
+			doClean(settings, path, true);			
 		}
+	}
 
+	private static void doCleanDirectory(Settings settings, String path)
+			throws IOException, MalformedURLException, Exception {
+		if(!path.endsWith(File.separator)) {
+			path=path+File.separator;
+		}
+		File[] files = new File(path).listFiles();
+		for (int i = 0; i < files.length; i++) {
+			if(files[i].isFile()) {
+				doClean(settings, files[i].getAbsolutePath(), false);
+			}
+		}
+	}
+
+	private static void doCleanDirectoryRecursively(Settings settings, String path)
+			throws IOException, MalformedURLException, Exception {
+		Stream<Path> pathStream = Files.walk(Paths.get(path))
+			.filter(Files::isRegularFile);
+		
+		Iterator<Path> pathIterator = pathStream.iterator();
+		while(pathIterator.hasNext()) {
+			Path pathP = pathIterator.next();
+			doClean(settings, pathP.toString(), false);
+		}
+	}
+
+	private static void doClean(Settings settings, String path, boolean throwUnsupported)
+			throws IOException, MalformedURLException, Exception {
 		String pathLower = path.toLowerCase();
 		int lastDot = path.lastIndexOf(".") + 1;
 		String fileEnding = pathLower.substring(lastDot);
-		if(lastDot==0) {
-			throw new UnsupportedOperationException("\\_ i require a file ending (no dot found)");
+		if (lastDot == 0) {
+			if(throwUnsupported) {
+				throw new UnsupportedOperationException("\\_ requiring a file ending (no dot found)");				
+			}else {
+				System.out.println("\\_ skipping '"+path+"' - requiring a file ending (no dot found)");
+				return;
+			}
 		}
 
 		if (fileEnding.equals("jpg") || fileEnding.equals("jpeg")) {
-			matchedEnding(fileEnding);
-			stripImage("jpg", settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripImage(path, "jpg", settings);
 		} else if (fileEnding.equals("png")) {
-			matchedEnding(fileEnding);
-			stripImage("png", settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripImage(path, "png", settings);
 		} else if (fileEnding.equals("pdf")) {
-			matchedEnding(fileEnding);
-			stripPDF(settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripPDF(path, settings);
 		} else if (fileEnding.equals("odt") || fileEnding.equals("ods") || fileEnding.equals("odp")) {
-			matchedEnding(fileEnding);
-			stripOpenDoc(settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripOpenDoc(path, settings);
 		} else if (fileEnding.equals("doc") || fileEnding.equals("xls") || fileEnding.equals("ppt")) {
-			matchedEnding(fileEnding);
-			stripMSDoc(settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripMSDoc(path, settings);
 		} else if (fileEnding.equals("docx")) {
-			matchedEnding(fileEnding);
-			stripMSDocNew(settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripMSDocNew(path, settings);
 		} else if (fileEnding.equals("xlsx")) {
-			matchedEnding(fileEnding);
-			stripMSDocExcelNew(settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripMSDocExcelNew(path, settings);
 		} else if (fileEnding.equals("xml")) {
-			matchedEnding(fileEnding);
-			stripXMLComments(settings);
+			matchedEnding(fileEnding,throwUnsupported);
+			stripXMLComments(path, settings);
 		} else {
-			throw new UnsupportedOperationException("\\_ metacleaner does not (yet) support the file type '" + fileEnding + "'. feel free to open a GitHub issue!");
+			if (throwUnsupported) {
+				throw new UnsupportedOperationException("\\_ metacleaner does not (yet) support the file type '"
+						+ fileEnding + "'. feel free to open a GitHub issue!");
+			} else {
+				System.out.println("\\_ skipping file '" + path + "' due to unsupported file type.");
+				return;
+			}
 		}
-		System.out.println("\\_ cleaned document successfully written to " + settings.getOutputPath());
+		System.out.println("\\_ cleaned document successfully written to " + settings.getOutputPath(path));
 	}
 
-
-	private static void matchedEnding(String fileEnding) {
-		System.out.println("\\_ supporting '"+fileEnding+"' files - continuing");
+	private static void matchedEnding(String fileEnding, boolean printSupported) {
+		if(printSupported) {
+			System.out.println("\\_ supporting '" + fileEnding + "' files - continuing");			
+		}
 	}
 
-	private static void stripXMLComments(Settings settings) throws IOException {
-		String xml = Helpers.readLbL(settings.getPath());
+	private static void stripXMLComments(String path, Settings settings) throws IOException {
+		String xml = Helpers.readLbL(path);
 		xml = xml.replaceAll("(?s)<!--.*?-->", "");
-		Writer out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(settings.getOutputPath()), StandardCharsets.UTF_8));
+		Writer out = new BufferedWriter(
+				new OutputStreamWriter(new FileOutputStream(settings.getOutputPath(path)), StandardCharsets.UTF_8));
 		try {
 			out.write(xml);
 		} finally {
@@ -125,28 +173,25 @@ public class Cleaner {
 		}
 	}
 
-	private static void stripMSDocExcelNew(Settings settings)
-			throws EncryptedDocumentException, IOException {
-		
-		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(settings.getPath()));
+	private static void stripMSDocExcelNew(String path, Settings settings) throws EncryptedDocumentException, IOException {
+
+		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(path));
 		POIXMLProperties props = wb.getProperties();
 
 		nullCoreProperties(props);
 
 		POIXMLProperties.CustomProperties custProp = props.getCustomProperties();
 
-		removeUnderlyingProps(custProp,0);
-	
-		// custProp.addProperty("Author", "test");
-
+		removeUnderlyingProps(custProp, 0);
 		nullExtendedProperties(props);
 
-		FileOutputStream fos = new FileOutputStream(settings.getOutputPath());
+		// custProp.addProperty("Author", "test");
+
+		FileOutputStream fos = new FileOutputStream(settings.getOutputPath(path));
 		wb.write(fos);
 		fos.close();
 		wb.close();
 	}
-
 
 	private static void nullExtendedProperties(POIXMLProperties props) {
 		ExtendedProperties extendedProperties = props.getExtendedProperties();
@@ -158,7 +203,6 @@ public class Cleaner {
 		extendedProperties.setTemplate("");
 		extendedProperties.setTotalTime(0);
 	}
-
 
 	private static void nullCoreProperties(POIXMLProperties props) {
 		POIXMLProperties.CoreProperties coreProp = props.getCoreProperties();
@@ -179,48 +223,48 @@ public class Cleaner {
 		coreProp.setTitle("");
 	}
 
-	
 	private static void removeUnderlyingProps(POIXMLProperties.CustomProperties custProp, int depth) {
 		CTProperties underlying = custProp.getUnderlyingProperties();
 		for (int i = 0; i < underlying.sizeOfPropertyArray(); i++) {
 			underlying.removeProperty(i);
 		}
-		// this needs to be done as XLSX seem to have trouble removing all custom properties in the first go
+		// this needs to be done as XLSX seem to have trouble removing all custom
+		// properties in the first go
 		// DOCX was fine however.
-		if(underlying.sizeOfPropertyArray()>0) {
+		if (underlying.sizeOfPropertyArray() > 0) {
 			depth++;
-			if(depth>10) {
+			if (depth > 10) {
 				System.out.println("Could not remove all underlying custom properties as reached max recursion depth");
 			}
-			removeUnderlyingProps(custProp,depth);
+			removeUnderlyingProps(custProp, depth);
 		}
 	}
 
-	private static void stripMSDocNew(Settings settings) throws Exception {
-		XWPFDocument docx = new XWPFDocument(new FileInputStream(settings.getPath()));
+	private static void stripMSDocNew(String path, Settings settings) throws Exception {
+		XWPFDocument docx = new XWPFDocument(new FileInputStream(path));
 		POIXMLProperties properties = docx.getProperties();
-		
+
 		nullCoreProperties(properties);
-		
+
 		org.apache.poi.ooxml.POIXMLProperties.CustomProperties customProperties = properties.getCustomProperties();
-		removeUnderlyingProps(customProperties,0);
+		removeUnderlyingProps(customProperties, 0);
 
 		nullExtendedProperties(properties);
-				
-		FileOutputStream fos = new FileOutputStream(settings.getOutputPath());
+
+		FileOutputStream fos = new FileOutputStream(settings.getOutputPath(path));
 		docx.write(fos);
 		fos.close();
 		docx.close();
 
 	}
 
-	private static void stripMSDoc(Settings settings) throws Exception {
-		InputStream is = new FileInputStream(settings.getPath());
+	private static void stripMSDoc(String path, Settings settings) throws Exception {
+		InputStream is = new FileInputStream(path);
 		POIFSFileSystem poifs = new POIFSFileSystem(is);
 		is.close();
 		DirectoryEntry dir = poifs.getRoot();
 		clearEntries(dir, settings);
-		OutputStream out = new FileOutputStream(settings.getOutputPath());
+		OutputStream out = new FileOutputStream(settings.getOutputPath(path));
 		poifs.writeFilesystem(out);
 		out.close();
 		poifs.close();
@@ -247,7 +291,6 @@ public class Cleaner {
 						}
 						if (si != null) {
 							si.setApplicationName("");
-							System.out.println(si.getAuthor() + "PRE");
 							si.setAuthor("");
 							si.setCreateDateTime(Calendar.getInstance().getTime());
 							si.setEditTime(0);
@@ -302,8 +345,8 @@ public class Cleaner {
 		}
 	}
 
-	private static void stripOpenDoc(Settings settings) throws MalformedURLException, IOException, Exception {
-		TextDocument odfDoc = TextDocument.loadDocument(new File(settings.getPath()));
+	private static void stripOpenDoc(String path, Settings settings) throws MalformedURLException, IOException, Exception {
+		TextDocument odfDoc = TextDocument.loadDocument(new File(path));
 		Meta metadata = odfDoc.getOfficeMetadata();
 
 		List<String> userDefinedNames = metadata.getUserDefinedDataNames();
@@ -327,24 +370,24 @@ public class Cleaner {
 			metadata.setTitle("");
 		}
 
-		odfDoc.save(settings.getOutputPath());
+		odfDoc.save(settings.getOutputPath(path));
 		odfDoc.close();
 	}
 
-	private static void stripImage(String outType, Settings settings) {
+	private static void stripImage(String path, String outType, Settings settings) {
 		BufferedImage image;
 		try {
-			image = ImageIO.read(new File(settings.getPath()));
-			String writeToPath = settings.getOutputPath();
+			image = ImageIO.read(new File(path));
+			String writeToPath = settings.getOutputPath(path);
 			ImageIO.write(image, outType, new File(writeToPath));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private static void stripPDF(Settings settings) throws IOException {
+	private static void stripPDF(String path, Settings settings) throws IOException {
 		// TODO harshmode, don't strip title? does pdf have those fields?
-		PDDocument document = PDDocument.load(new File(settings.getPath()));
+		PDDocument document = PDDocument.load(new File(path));
 		// clean basic
 		PDDocumentInformation empty = new PDDocumentInformation();
 		document.setDocumentInformation(empty);
@@ -353,6 +396,6 @@ public class Cleaner {
 		PDMetadata newMetadata = new PDMetadata(document, new ByteArrayInputStream("".getBytes()));
 		catalog.setMetadata(newMetadata);
 
-		document.save(settings.getOutputPath());
+		document.save(settings.getOutputPath(path));
 	}
 }
