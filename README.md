@@ -1,3 +1,7 @@
+![build status](https://api.travis-ci.com/ozzi-/metacleaner.svg?branch=master)
+![licence](https://img.shields.io/github/license/ozzi-/metacleaner.svg)
+![open issues](https://img.shields.io/github/issues/ozzi-/metacleaner.svg)
+
 # metacleaner
 metacleaner will remove metadata of the following filetypes:
 - jpg
