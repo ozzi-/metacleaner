@@ -2,11 +2,10 @@ language: java
 
 sudo: false
 
-dist: trusty
+dist: bionic
 
 jdk:
-  - openjdk10
-  - openjdk11
+  - openjdk8
 
 branches:
   only:
