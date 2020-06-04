@@ -27,6 +27,9 @@ public class Helpers {
         Option suffix = new Option("s", "suffix", true, "suffix of output file");
         options.addOption(suffix);
         
+        Option filetype = new Option("f", "filetype", true, "override file ending in file path with this parameter");
+        options.addOption(filetype);
+        
         Option recursive = new Option("r", "recursive", false, "search for files recursively if input path is a directory");
         options.addOption(recursive);
 
@@ -66,18 +69,23 @@ public class Helpers {
         	System.out.println("\\_ using harsh mode");
         }
         
+        String fileEndingForcedVal = cmd.getOptionValue("filetype");
+        if(fileEndingForcedVal!=null) {
+        	System.out.println("\\_ forcing file type '"+fileEndingForcedVal+"'");
+        }
+        
         boolean isDirectory=false;
 		File file = new File(inputFilePath);
 		if(file.isDirectory()) {
 			isDirectory=true;
 			System.out.println("\\_ input path is a directory - "+(recursiveVal?"will scan recursively for files":"won't scan recursively"));
 		}else if (!file.exists()) {
-			throw new FileNotFoundException("File '" + inputFilePath + "' not found or readable");
+			throw new FileNotFoundException("File / Folder '" + inputFilePath + "' not found or readable");
 		}else {
 			System.out.println("\\_ input path is a file");
 		}
         
-        return new Settings(inputFilePath, isDirectory, recursiveVal, overwriteVal, suffixVal, harshVal);
+        return new Settings(inputFilePath, isDirectory, recursiveVal, overwriteVal, suffixVal, harshVal, fileEndingForcedVal);
 	}
 	
 	static void matchedEnding(String fileEnding, boolean printSupported) {
@@ -94,6 +102,9 @@ public class Helpers {
 	}
 
 	static boolean isAlreadyClean(Settings settings, String pathS) {
+		if(settings.isOverwrite()) {
+			return false;
+		}
 		int lastDotPos = pathS.lastIndexOf(".");
 		String fileEnding = pathS.substring(lastDotPos + 1);
 		String endsWith="";
@@ -103,6 +114,11 @@ public class Helpers {
 			endsWith = settings.getSuffix()+"."+fileEnding;
 		}
 		return pathS.toLowerCase().endsWith(endsWith.toLowerCase());
+	}
+	
+	static double getFileSizeB(String path) {
+		File file = new File(path);
+		return file.length();
 	}
 	
 	public static String readLbL(String filePath) {

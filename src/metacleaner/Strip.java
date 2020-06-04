@@ -61,14 +61,12 @@ public class Strip {
 		XSSFWorkbook wb = new XSSFWorkbook(new FileInputStream(path));
 		POIXMLProperties props = wb.getProperties();
 
-		nullCoreProperties(props);
+		nullCoreProperties(props,settings.isHarshMode());
 
 		POIXMLProperties.CustomProperties custProp = props.getCustomProperties();
 
 		removeUnderlyingProps(custProp, 0);
-		nullExtendedProperties(props);
-
-		// custProp.addProperty("Author", "test");
+		nullExtendedProperties(props,settings.isHarshMode());
 
 		FileOutputStream fos = new FileOutputStream(settings.getOutputPath(path));
 		wb.write(fos);
@@ -76,7 +74,7 @@ public class Strip {
 		wb.close();
 	}
 
-	private static void nullExtendedProperties(POIXMLProperties props) {
+	private static void nullExtendedProperties(POIXMLProperties props, boolean harshMode) {
 		ExtendedProperties extendedProperties = props.getExtendedProperties();
 		extendedProperties.setApplication("");
 		extendedProperties.setAppVersion("");
@@ -87,7 +85,7 @@ public class Strip {
 		extendedProperties.setTotalTime(0);
 	}
 
-	private static void nullCoreProperties(POIXMLProperties props) {
+	private static void nullCoreProperties(POIXMLProperties props, boolean harshMode) {
 		POIXMLProperties.CoreProperties coreProp = props.getCoreProperties();
 		coreProp.setCategory("");
 		coreProp.setContentStatus("");
@@ -102,8 +100,9 @@ public class Strip {
 		coreProp.setModified("");
 		coreProp.setRevision("");
 		coreProp.setSubjectProperty("");
-		// TODO harshmode excludes
-		coreProp.setTitle("");
+		if(harshMode) {
+			coreProp.setTitle("");			
+		}
 	}
 
 	private static void removeUnderlyingProps(POIXMLProperties.CustomProperties custProp, int depth) {
@@ -127,12 +126,12 @@ public class Strip {
 		XWPFDocument docx = new XWPFDocument(new FileInputStream(path));
 		POIXMLProperties properties = docx.getProperties();
 
-		nullCoreProperties(properties);
+		nullCoreProperties(properties,settings.isHarshMode());
 
 		org.apache.poi.ooxml.POIXMLProperties.CustomProperties customProperties = properties.getCustomProperties();
 		removeUnderlyingProps(customProperties, 0);
 
-		nullExtendedProperties(properties);
+		nullExtendedProperties(properties,settings.isHarshMode());
 
 		FileOutputStream fos = new FileOutputStream(settings.getOutputPath(path));
 		docx.write(fos);
@@ -207,7 +206,7 @@ public class Strip {
 							dsi.setCustomProperties(new CustomProperties());
 							dsi.setApplicationVersion(0);
 							dsi.setCategory("");
-							dsi.setCompany("lmao");
+							dsi.setCompany("");
 							dsi.setContentStatus("");
 							dsi.setContentType("");
 							dsi.setDocumentVersion("");

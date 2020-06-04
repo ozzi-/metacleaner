@@ -7,15 +7,16 @@ public class Settings {
 	private String suffix;
 	private boolean harshMode;
 	private String path;
-	
+	private String fileEndingForced;
 
-	public Settings(String path, boolean isDirectory, boolean recursive, boolean overwrite, String suffix, boolean harshMode) {
+	public Settings(String path, boolean isDirectory, boolean recursive, boolean overwrite, String suffix, boolean harshMode, String fileEndingForced) {
 		this.path=path;
 		this.isDirectory=isDirectory;		
 		this.recursive=recursive;
 		this.overwrite=overwrite;
 		this.suffix=suffix;
 		this.harshMode = harshMode;
+		this.fileEndingForced = fileEndingForced;
 	}
 	
 	public String getOutputPathStrict(String path) {
@@ -75,5 +76,17 @@ public class Settings {
 
 	public void setDirectory(boolean isDirectory) {
 		this.isDirectory = isDirectory;
+	}
+	
+	public boolean isFileEndingForced() {
+		return fileEndingForced!=null;
+	}
+
+	public String getFileEndingForced() {
+		return fileEndingForced;
+	}
+
+	public void setFileEndingForced(String fileEndingForced) {
+		this.fileEndingForced = fileEndingForced;
 	}
 }

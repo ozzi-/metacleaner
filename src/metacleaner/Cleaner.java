@@ -1,6 +1,7 @@
 package metacleaner;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
@@ -13,24 +14,35 @@ import java.util.stream.Stream;
 public class Cleaner {
 
 	// TODO add ZIP support - https://github.com/KittyHawkCorp/stripzip/ ?
-	// TODO check filesize before and after to determine if any meta was actually removed
-	// TODO nicer ascii tree structure 
+	// TODO add mysql dump support
 	
+	public static int cleanedFiles;
+	public static int totalFiles;
+		
 	public static void main(String[] args) {
-		System.out.println("metacleaner - github.com/ozzi-/metacleaner");
-		System.out.println("------------------------------------------");
+		System.out.println("metacleaner 1.0 - github.com/ozzi-/metacleaner");
+		System.out.println("----------------------------------------------");
 		try {
 			Settings settings = Helpers.parseCLIArgs(args);
-			clean(settings);
+			boolean cleanHadErrors = clean(settings);
+			if(cleanHadErrors) {
+				System.out.println("\\_ Exiting with error code (1)");
+				System.exit(1);				
+			}
+		} catch (FileNotFoundException e) {
+			System.out.println("\\_ "+e.getMessage());
+			System.out.println("\\_ Exiting with error code (2)");
+			System.exit(2);
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.out.println("Exiting (1)");
-			System.exit(1);
+			System.out.println("\\_ Exiting with error code (3)");
+			System.exit(3);
 		}
-		System.out.println("\\_ done");
+		System.out.println("\\_ cleaned "+cleanedFiles+" of "+totalFiles+" files");
 	}
 
-	public static void clean(Settings settings) throws Exception {
+	public static boolean clean(Settings settings) throws Exception {
+		boolean cleanHasErrors = false;
 		String path = settings.getPath();
 		if(settings.isDirectory()) {
 			if(settings.isRecursive()) {
@@ -39,8 +51,12 @@ public class Cleaner {
 				doCleanDirectory(settings, path);
 			}
 		}else {
-			doClean(settings, path, true);			
+			boolean result = doClean(settings, path, true);
+			if(!result) {
+				cleanHasErrors=true;
+			}
 		}
+		return cleanHasErrors;
 	}
 
 	private static void doCleanDirectory(Settings settings, String path)
@@ -67,27 +83,36 @@ public class Cleaner {
 		}
 	}
 	
-	private static void doClean(Settings settings, String path, boolean throwUnsupported)
+	private static boolean doClean(Settings settings, String path, boolean escalateUnsupported)
 			throws IOException, MalformedURLException, Exception {
+		totalFiles++;
 		String filePathRelative = settings.isDirectory()?path.replace(settings.getPath(), ""):path;
-		System.out.println("  |_ '"+filePathRelative+"'");
+		String filePathRelativePrintable = filePathRelative.startsWith(File.separator)?filePathRelative.substring(1):filePathRelative;
+		System.out.println("  |_ '"+filePathRelativePrintable+"'");
 		if(Helpers.isAlreadyClean(settings, path)) {
 			System.out.println("    |_ skipping '"+path+"' as assumed it was already cleaned (ends with suffix '"+settings.getSuffix()+"')");
-			return;
+			return true;
 		}
 		
 		String pathLower = path.toLowerCase();
 		int lastDot = path.lastIndexOf(".") + 1;
 		String fileEnding = pathLower.substring(lastDot);
-		if (lastDot == 0) {
-			if(throwUnsupported) {
-				throw new UnsupportedOperationException("    |_ requiring a file ending (no dot found)");				
+		if (lastDot == 0 && !settings.isFileEndingForced()) {
+			if(escalateUnsupported) {
+				System.out.println("    |_ requiring a file ending (no dot found)");
+				return false;
 			}else {
 				System.out.println("    |_ skipping '"+path+"' - requiring a file ending (no dot found)");
-				return;
+				return true;
 			}
 		}
-
+		
+		if(settings.isFileEndingForced()) {
+			fileEnding=settings.getFileEndingForced();
+		}
+		
+		double fileSizeBefore = Helpers.getFileSizeB(path);
+		
 		if (fileEnding.equals("jpg") || fileEnding.equals("jpeg")) {
 			Strip.image(path, "jpg", settings);
 		} else if (fileEnding.equals("png")) {
@@ -105,17 +130,16 @@ public class Cleaner {
 		} else if (fileEnding.equals("xml")) {
 			Strip.xmlComments(path, settings);
 		} else {
-			if (throwUnsupported) {
-				throw new UnsupportedOperationException("    |_ metacleaner does not (yet) support the file type '"
-						+ fileEnding + "'. feel free to open a GitHub issue!");
-			} else {
-				System.out.println("    |_ skipping file '" + path + "' due to unsupported file type.");
-				return;
-			}
+			System.out.println("    |_ metacleaner does not (yet - feel free to open a GitHub issue) support the file type '"
+					+ fileEnding + "'. If the file ending differs the actual file type, use the -f option.");
+			return !escalateUnsupported;
 		}
-		Helpers.matchedEnding(fileEnding,throwUnsupported);
-		System.out.println("    |_ cleaned document successfully written to " + settings.getOutputPath(path));
+		Helpers.matchedEnding(fileEnding,escalateUnsupported);
+		double fileSizeAfter = Helpers.getFileSizeB(settings.getOutputPath(path));
+		double fileSizeDiff = fileSizeBefore-fileSizeAfter;
+		String fileSizeDiffTrimmed = new java.text.DecimalFormat("0").format(fileSizeDiff);
+		cleanedFiles++;
+		System.out.println("    |_ cleaned document (stripped "+fileSizeDiffTrimmed+" B) successfully written to \'" + settings.getOutputPath(path)+"\'");
+		return true;
 	}
-
-
 }
